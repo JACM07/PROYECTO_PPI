@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todos los pacientes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+
+<h2>Información de los pacientes</h2>
+<form>
+    <div class="mb-3 mt-3">
+        <label for="patientPhoneNumber" class="form-label">Número de teléfono:</label>
+        <input type="text" class="form-control" id="patientPhoneNumber" placeholder="Ingresa el número de teléfono a buscar" name="patientPhoneNumber">
+    </div>
+    <div class="mb-3 mt-3">
+        <label for="patientName" class="form-label">Nombre:</label>
+        <input type="text" class="form-control" id="patientName" placeholder="Ingresa el nombre a buscar" name="patientName">
+    </div>
+    <button type="button" class="btn btn-info" onclick="findPatient('patientPhoneNumber','/findPatientByPhoneNumber/')">Buscar por Número de teléfono</button>
+    <button type="button" class="btn btn-info" onclick="findPatient('patientName','/findPatientByName/')">Buscar por Nombre</button>
+    <button type="button" class="btn btn-outline-secondary" onclick="populateTableFromJSON(url)">Limpiar filtros</button>
+</form>
+<br/>
+<table id="patientsTable" class="table table-success table-striped-columns">
+    <thead>
+    <tr>
+        <th>Id</th>
+        <th>Número de teléfono</th>
+        <th>Nombre</th>
+        <th>Enfermedad</th>
+        <th>Estatura</th>
+        <th>Edad</th>
+        <th>Más Opciones</th>
+    </tr>
+    </thead>
+    <tbody>
+    <!-- Se llenará automaticamente -->
+    </tbody>
+</table>
+<br/>
+<a href="index.html" type="button" class="btn btn-outline-dark">Registrar nuevo paciente</a>
+
+<script>
+
+    // URL from which JSON data will be fetched
+    const url = "http://PACIENTES-env.eba-iwpn59ex.us-east-2.elasticbeanstalk.com/patients";
+
+    // Function to populate table from JSON data
+    async function populateTableFromJSON(url) {
+        cleanTableRows();
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const allPatientsFromDB = await response.json();
+            const tableBody = document.querySelector("#patientsTable tbody");
+            allPatientsFromDB.forEach(patient => {
+
+                const row = document.createElement("tr");
+                let idNumber = patient.id;
+                row.innerHTML = `
+                    <td class="id">${idNumber}</td>
+                    <td contenteditable="false">${patient.phoneNumber}</td>
+                    <td contenteditable="false">${patient.name}</td>
+                    <td contenteditable="false">${patient.illness}</td>
+                    <td contenteditable="false">${patient.height}</td>
+                    <td contenteditable="false">${patient.age}</td>
+                    <td><button type="button" class="btn btn-danger" id="${idNumber}" onclick="deletePatientButton(id)">Eliminar</button>
+                    <button type="button" class="btn btn-warning" id="${idNumber}" onclick="editPatient(id)">Editar</button></td>
+                `;
+                row.setAttribute("id", idNumber);
+                tableBody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('There was a problem with the fetch operation:', error);
+        }
+    }
+
+    // Call the function to populate table
+    populateTableFromJSON(url);
+
+    function editPatient(buttonPressId) {
+        //obtener la row que fue llamada
+        let row = document.getElementById(buttonPressId);
+
+        let phoneNumberCell = row.children.item(1);
+        let nameCell = row.children.item(2);
+        let illnessCell = row.children.item(3);
+        let heightCell = row.children.item(4);
+        let ageCell = row.children.item(5);
+
+        //cambiar la propiedad content editable
+        phoneNumberCell.setAttribute("contenteditable", "true");
+        nameCell.setAttribute("contenteditable", "true");
+        illnessCell.setAttribute("contenteditable", "true");
+        heightCell.setAttribute("contenteditable", "true");
+        ageCell.setAttribute("contenteditable", "true");
+
+        //poner el cursor sobre la celda 1
+        row.children.item(1).focus();
+
+        //cambiar el texto y color del boton de editar por guardar
+        let editButton = row.children.item(6).children.item(1);
+        editButton.setAttribute("class","btn btn-success");
+        editButton.innerHTML = "Guardar";
+
+
+        //al presionar el botón de guardar mandar llamar al metodo savePatient(con los datos de la fila)
+        editButton.setAttribute("onClick","savePatient("+buttonPressId+")");
+
+    }
+
+    function savePatient(idButtonPress) {
+
+        console.log(idButtonPress);
+
+        let row = document.getElementById(idButtonPress);
+
+        let idCell = row.children.item(0);
+        let phoneNumberCell = row.children.item(1);
+        let nameCell = row.children.item(2);
+        let illnessCell = row.children.item(3);
+        let heightCell = row.children.item(4);
+        let ageCell = row.children.item(5);
+
+        console.log("row.children.item(2)="+nameCell.innerHTML);
+
+
+        const PatientUpdated = {
+            id : idCell.innerHTML,
+            phoneNumber : phoneNumberCell.innerHTML,
+            name : nameCell.innerHTML,
+            illness : illnessCell.innerHTML,
+            height : heightCell.innerHTML,
+            age : ageCell.innerHTML
+        };
+
+
+        const apiUrl = "http://PACIENTES-env.eba-iwpn59ex.us-east-2.elasticbeanstalk.com/patients";
+
+
+        // Configure the request
+        const requestOptions = {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(PatientUpdated)
+        };
+
+        // Make the POST request
+        fetch(apiUrl, requestOptions)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(patientFromAPI => {
+                console.log('Success:', patientFromAPI);
+                populateTableFromJSON(url);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Handle error here
+            });
+
+    }
+    function findPatient(id,findPath){
+        cleanTableRows();
+        populateTableFromJSON(url+findPath+document.getElementById(id).value);
+    }
+
+    function cleanTableRows() {
+        var tableHeaderRowCount = 1;
+        var table = document.getElementById('patientsTable');
+        var rowCount = table.rows.length;
+        for (var i = tableHeaderRowCount; i < rowCount; i++) {
+            table.deleteRow(tableHeaderRowCount);
+        }
+    }
+
+    function deletePatientButton(id) {
+        if (confirm("Estas seguro de eliminar al paciente: "+id)) {
+            deletePatient(id);
+        } else {
+            console.log("No se ha eliminado al paciente");
+        }
+    }
+
+    function deletePatient(id) {
+        const deleteUrl = "http://PACIENTES-env.eba-iwpn59ex.us-east-2.elasticbeanstalk.com/patients/delete-patient-by-id?id="+id;
+        fetch(deleteUrl, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+
+            },
+
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response;
+            })
+            .then(data => {
+                console.log('OK', data);
+                populateTableFromJSON(url);
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+    }
+</script>
+
+</body>
+</html>
